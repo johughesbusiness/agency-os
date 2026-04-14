@@ -1,5 +1,11 @@
-﻿import { SignedIn, SignedOut, SignIn, UserButton } from '@clerk/clerk-react'
-import { useState } from "react";
+﻿import { SignedIn, SignedOut, SignIn, UserButton, useUser } from '@clerk/clerk-react'
+import { useState, useEffect, useCallback } from "react";
+import { createClient } from '@supabase/supabase-js';
+
+const supabase = createClient(
+  import.meta.env.VITE_SUPABASE_URL,
+  import.meta.env.VITE_SUPABASE_ANON_KEY
+);
 
 const C = {
   bg:"#060609", surface:"#0c0c14", card:"#10101c",
@@ -709,34 +715,148 @@ function ReportingTab({client,onUpdateClient}) {
 }
 
 function AddClientModal({onAdd,onClose}) {
-  const [name,setName]=useState(""); const [demo,setDemo]=useState(true);
-  const COLORS=[C.emerald,C.accent,C.purple,C.gold,C.sky,C.rose,C.amber];
-  const blank=n=>({id:uid(),name:n,color:COLORS[Math.floor(Math.random()*COLORS.length)],ghlContactId:"",slackChannel:"",reportEmail:"",
-    social:Object.fromEntries(Object.keys(PLAT).map(p=>[p,{connected:false,followers:0,growth:0,views:0,videos:[],trend:[]}])),
-    ecommerce:Object.fromEntries(Object.keys(ECOM).map(p=>[p,{connected:false}])),
-    ads:Object.fromEntries(Object.keys(ADS).map(p=>[p,{connected:false}])),
-    email:Object.fromEntries(Object.keys(EMAIL).map(p=>[p,{connected:false}])),
-    influencers:[],calendar:[]});
-  const demoify=c=>{
-    const f=Math.floor; const r=Math.random;
-    c.social.youtube={connected:true,followers:f(r()*60000+5000),growth:+(r()*5+1).toFixed(1),views:f(r()*2e6+2e5),videos:[{title:"Top Tips",views:f(r()*1e5+1e4),likes:3000,comments:150,eng:5.4}],trend:[5,7,9,12,15,18,21,24]};
-    c.social.instagram={connected:true,followers:f(r()*40000+3000),growth:+(r()*8+2).toFixed(1),views:f(r()*1e6+1e5),videos:[{title:"Reel Hit",views:f(r()*8e4+5000),likes:4000,comments:200,eng:7.2}],trend:[3,5,7,9,12,15,18,20]};
-    c.ecommerce.shopify={connected:true,revenue:f(r()*1e5+2e4),orders:f(r()*2000+400),aov:+(r()*40+25).toFixed(1),topProducts:[{name:"Best Seller",sales:280,revenue:11200}],trend:[4,5,6.5,8,9.5,11,12,14].map(v=>v*1000)};
-    c.ads.meta={connected:true,spend:f(r()*5000+1000),revenue:f(r()*2e4+5000),roas:+(r()*4+2).toFixed(2),clicks:f(r()*1e4+2000),impressions:f(r()*3e5+5e4),ctr:+(r()*3+1).toFixed(2),campaigns:[{name:"Main Campaign",spend:2000,revenue:9000,roas:4.5}]};
-    c.calendar=[{id:uid(),title:"Weekly Content",platform:"instagram",date:dayOff(3),time:"10:00",status:"idea",notes:""}];
+  const [step,setStep]=useState(1);
+  const [name,setName]=useState("");
+  const [color,setColor]=useState(C.emerald);
+  const [handles,setHandles]=useState({instagram:"",facebook:"",tiktok:"",youtube:"",snapchat:"",x:""});
+  const [followers,setFollowers]=useState({instagram:"",facebook:"",tiktok:"",youtube:"",snapchat:"",x:""});
+  const [shopifyUrl,setShopifyUrl]=useState("");
+  const [shopifyRevenue,setShopifyRevenue]=useState("");
+  const [shopifyOrders,setShopifyOrders]=useState("");
+  const [useDemo,setUseDemo]=useState(false);
+
+  const COLORS=[C.emerald,C.accent,C.purple,C.gold,C.sky,C.rose,C.amber,"#f472b6","#fb923c"];
+
+  const buildClient=()=>{
+    const c={
+      id:uid(), name:name.trim(), color,
+      ghlContactId:"", slackChannel:"", reportEmail:"",
+      social:Object.fromEntries(Object.keys(PLAT).map(p=>{
+        const f=parseInt(followers[p])||0;
+        const on=f>0||handles[p].trim()!=="";
+        return [p,{connected:on,followers:f,growth:0,views:0,videos:[],trend:on?[0,0,0,0,0,0,0,f]:[],handle:handles[p].trim()}];
+      })),
+      ecommerce:{
+        shopify:{connected:!!(shopifyUrl||shopifyRevenue),revenue:parseFloat(shopifyRevenue)||0,orders:parseInt(shopifyOrders)||0,aov:0,topProducts:[],trend:[0,0,0,0,0,0,0,parseFloat(shopifyRevenue)||0],storeUrl:shopifyUrl},
+        woocommerce:{connected:false},etsy:{connected:false},square:{connected:false},tiktokshop:{connected:false},
+      },
+      ads:{google:{connected:false},meta:{connected:false}},
+      email:{klaviyo:{connected:false},mailchimp:{connected:false}},
+      influencers:[],calendar:[],
+    };
+    if(useDemo){
+      const f=Math.floor; const r=Math.random;
+      if(!parseInt(followers.instagram)) c.social.instagram={connected:true,followers:f(r()*40000+3000),growth:+(r()*8+2).toFixed(1),views:f(r()*1e6+1e5),videos:[{title:"Reel Hit",views:f(r()*8e4+5000),likes:4000,comments:200,eng:7.2}],trend:[3,5,7,9,12,15,18,20],handle:handles.instagram};
+      if(!parseInt(followers.youtube))   c.social.youtube={connected:true,followers:f(r()*60000+5000),growth:+(r()*5+1).toFixed(1),views:f(r()*2e6+2e5),videos:[{title:"Top Tips",views:f(r()*1e5+1e4),likes:3000,comments:150,eng:5.4}],trend:[5,7,9,12,15,18,21,24],handle:""};
+      if(!parseFloat(shopifyRevenue))    c.ecommerce.shopify={connected:true,revenue:f(r()*1e5+2e4),orders:f(r()*2000+400),aov:+(r()*40+25).toFixed(1),topProducts:[{name:"Best Seller",sales:280,revenue:11200}],trend:[4,5,6.5,8,9.5,11,12,14].map(v=>v*1000),storeUrl:shopifyUrl};
+      c.ads.meta={connected:true,spend:f(r()*5000+1000),revenue:f(r()*2e4+5000),roas:+(r()*4+2).toFixed(2),clicks:f(r()*1e4+2000),impressions:f(r()*3e5+5e4),ctr:+(r()*3+1).toFixed(2),campaigns:[{name:"Main Campaign",spend:2000,revenue:9000,roas:4.5}]};
+      c.calendar=[{id:uid(),title:"Weekly Content",platform:"instagram",date:dayOff(3),time:"10:00",status:"idea",notes:""}];
+    }
     return c;
   };
-  return <div style={{position:"fixed",inset:0,background:"#000c",display:"flex",alignItems:"center",justifyContent:"center",zIndex:300}}>
-    <div style={{background:C.surface,border:`1px solid ${C.borderHi}`,borderRadius:16,padding:28,width:380,display:"flex",flexDirection:"column",gap:14}}>
-      <div style={{fontSize:17,fontWeight:800}}>Add New Client</div>
-      <Inp label="Client / Brand Name" value={name} onChange={setName} placeholder="e.g. Apex Fitness"/>
-      <label style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer",fontSize:13,color:C.sub}}>
-        <input type="checkbox" checked={demo} onChange={e=>setDemo(e.target.checked)} style={{accentColor:C.accent}}/>Pre-fill with demo data
-      </label>
-      <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>
-        <Btn outline onClick={onClose}>Cancel</Btn>
-        <Btn disabled={!name.trim()} onClick={()=>{const c=blank(name.trim());onAdd(demo?demoify(c):c);onClose();}}>Add Client</Btn>
+
+  const connectedPlats=Object.entries(handles).filter(([,v])=>v.trim()||followers[Object.keys(handles).find(k=>k)]!=="");
+
+  return <div style={{position:"fixed",inset:0,background:"#000d",display:"flex",alignItems:"center",justifyContent:"center",zIndex:300,overflowY:"auto",padding:20}}>
+    <div style={{background:C.surface,border:`1px solid ${C.borderHi}`,borderRadius:18,padding:28,width:480,display:"flex",flexDirection:"column",gap:18,maxHeight:"90vh",overflowY:"auto"}}>
+
+      {/* Header */}
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <div>
+          <div style={{fontSize:17,fontWeight:800}}>Add New Client</div>
+          <div style={{fontSize:11,color:C.muted,marginTop:2}}>Step {step} of 3</div>
+        </div>
+        <div style={{display:"flex",gap:6}}>
+          {[1,2,3].map(s=><div key={s} style={{width:28,height:4,borderRadius:2,background:s<=step?C.accent:C.border}}/>)}
+        </div>
       </div>
+
+      {/* Step 1 — Basic Info */}
+      {step===1&&<>
+        <div>
+          <div style={{fontSize:13,fontWeight:700,marginBottom:12,color:C.sub}}>Client Details</div>
+          <div style={{display:"flex",flexDirection:"column",gap:12}}>
+            <Inp label="Client / Brand Name" value={name} onChange={setName} placeholder="e.g. Rise Stronger & Co"/>
+            <div>
+              <label style={{fontSize:10,color:C.muted,textTransform:"uppercase",letterSpacing:1,display:"block",marginBottom:8}}>Brand Color</label>
+              <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                {COLORS.map(col=><button key={col} onClick={()=>setColor(col)} style={{width:28,height:28,borderRadius:"50%",background:col,border:color===col?`3px solid #fff`:`2px solid transparent`,cursor:"pointer"}}/>)}
+              </div>
+            </div>
+            <label style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer",fontSize:13,color:C.sub}}>
+              <input type="checkbox" checked={useDemo} onChange={e=>setUseDemo(e.target.checked)} style={{accentColor:C.accent}}/>
+              Fill empty fields with demo data
+            </label>
+          </div>
+        </div>
+        <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>
+          <Btn outline onClick={onClose}>Cancel</Btn>
+          <Btn disabled={!name.trim()} onClick={()=>setStep(2)}>Next → Social Media</Btn>
+        </div>
+      </>}
+
+      {/* Step 2 — Social Media */}
+      {step===2&&<>
+        <div>
+          <div style={{fontSize:13,fontWeight:700,marginBottom:4,color:C.sub}}>Social Media Accounts</div>
+          <div style={{fontSize:11,color:C.muted,marginBottom:14}}>Enter handles and follower counts. Leave blank if not on that platform.</div>
+          <div style={{display:"flex",flexDirection:"column",gap:12}}>
+            {Object.entries(PLAT).map(([p,pc])=>(
+              <div key={p} style={{background:C.card,borderRadius:10,padding:12}}>
+                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+                  <div style={{width:24,height:24,borderRadius:6,background:pc.color+"22",display:"flex",alignItems:"center",justifyContent:"center",color:pc.color,fontSize:12}}>{pc.icon}</div>
+                  <span style={{fontWeight:600,fontSize:13}}>{pc.label}</span>
+                </div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                  <Inp label="Handle / Username" value={handles[p]} onChange={v=>setHandles(h=>({...h,[p]:v}))} placeholder={`@${p}handle`}/>
+                  <Inp label="Followers" value={followers[p]} onChange={v=>setFollowers(f=>({...f,[p]:v}))} placeholder="0"/>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>
+          <Btn outline onClick={()=>setStep(1)}>← Back</Btn>
+          <Btn onClick={()=>setStep(3)}>Next → Store & Ads</Btn>
+        </div>
+      </>}
+
+      {/* Step 3 — Store & finalize */}
+      {step===3&&<>
+        <div>
+          <div style={{fontSize:13,fontWeight:700,marginBottom:4,color:C.sub}}>E-Commerce & Stats</div>
+          <div style={{fontSize:11,color:C.muted,marginBottom:14}}>Enter your current store stats. You can update these anytime from the Store tab.</div>
+          <div style={{display:"flex",flexDirection:"column",gap:12}}>
+            <Inp label="Shopify Store URL" value={shopifyUrl} onChange={setShopifyUrl} placeholder="yourstore.myshopify.com"/>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+              <Inp label="Monthly Revenue ($)" value={shopifyRevenue} onChange={setShopifyRevenue} placeholder="0"/>
+              <Inp label="Monthly Orders" value={shopifyOrders} onChange={setShopifyOrders} placeholder="0"/>
+            </div>
+          </div>
+
+          {/* Preview */}
+          <div style={{background:C.card,borderRadius:10,padding:14,marginTop:16}}>
+            <div style={{fontSize:11,color:C.muted,marginBottom:10,textTransform:"uppercase",letterSpacing:1}}>Client Preview</div>
+            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+              <div style={{width:10,height:10,borderRadius:"50%",background:color}}/>
+              <span style={{fontWeight:700,fontSize:14}}>{name}</span>
+            </div>
+            <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
+              {Object.entries(handles).filter(([,v])=>v.trim()).map(([p])=>(
+                <span key={p} style={{background:PLAT[p].color+"22",color:PLAT[p].color,borderRadius:4,padding:"2px 7px",fontSize:10,fontWeight:700}}>{PLAT[p].short} {followers[p]?fmt(parseInt(followers[p])):""}</span>
+              ))}
+              {Object.entries(followers).filter(([,v])=>parseInt(v)>0&&!handles[Object.keys(followers).find(k=>k)]).map(([p])=>(
+                <span key={p} style={{background:PLAT[p].color+"22",color:PLAT[p].color,borderRadius:4,padding:"2px 7px",fontSize:10,fontWeight:700}}>{PLAT[p].short} {fmt(parseInt(followers[p]))}</span>
+              ))}
+              {shopifyUrl&&<span style={{background:C.shopify+"22",color:C.shopify,borderRadius:4,padding:"2px 7px",fontSize:10,fontWeight:700}}>Shopify</span>}
+            </div>
+          </div>
+        </div>
+        <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>
+          <Btn outline onClick={()=>setStep(2)}>← Back</Btn>
+          <Btn disabled={!name.trim()} onClick={()=>{onAdd(buildClient());onClose();}}>✓ Add Client</Btn>
+        </div>
+      </>}
     </div>
   </div>;
 }
@@ -753,19 +873,76 @@ const TABS=[
 ];
 
 function Dashboard() {
-  const [clients,setClients]=useState(DEMO);
-  const [activeId,setActiveId]=useState(DEMO[0].id);
+  const {user} = useUser();
+  const [clients,setClients]=useState([]);
+  const [activeId,setActiveId]=useState(null);
   const [tab,setTab]=useState("social");
   const [showAdd,setShowAdd]=useState(false);
   const [sidebar,setSidebar]=useState(true);
-  const client=clients.find(c=>c.id===activeId)||clients[0];
-  const updClient=u=>setClients(cs=>cs.map(c=>c.id===u.id?u:c));
-  const delClient=id=>{ const r=clients.filter(c=>c.id!==id); setClients(r); if(activeId===id&&r.length) setActiveId(r[0].id); };
+  const [loading,setLoading]=useState(true);
+  const [saving,setSaving]=useState(false);
+
+  // Load clients from Supabase on mount
+  useEffect(()=>{
+    if(!user) return;
+    const load=async()=>{
+      setLoading(true);
+      const {data,error}=await supabase
+        .from("clients")
+        .select("*")
+        .eq("user_id",user.id)
+        .order("created_at",{ascending:true});
+if(!error&&data&&data.length>0){
+        const loaded=data.map(row=>({...row.data,id:row.id}));
+        setClients(loaded);
+        setActiveId(loaded[0].id);
+} else {
+        // No clients yet — start empty
+        setClients([]);
+        setActiveId(null);
+      }
+      setLoading(false);
+    };
+    load();
+  },[user]);
+
+  // Save a single client to Supabase
+  const saveClient=useCallback(async(c)=>{
+    setSaving(true);
+    await supabase.from("clients").upsert({id:c.id,user_id:user.id,name:c.name,data:c},{onConflict:"id"});
+    setSaving(false);
+  },[user]);
+
+  const updClient=async(u)=>{
+    setClients(cs=>cs.map(c=>c.id===u.id?u:c));
+    await saveClient(u);
+  };
+
+  const delClient=async(id)=>{
+    const r=clients.filter(c=>c.id!==id);
+    setClients(r);
+    if(activeId===id&&r.length) setActiveId(r[0].id);
+    await supabase.from("clients").delete().eq("id",id);
+  };
+
+  const addClient=async(c)=>{
+    setClients(cs=>[...cs,c]);
+    setActiveId(c.id);
+    await supabase.from("clients").insert({id:c.id,user_id:user.id,name:c.name,data:c});
+  };
+
   const exportAll=()=>{
     const blob=new Blob([JSON.stringify(clients,null,2)],{type:"application/json"});
     const url=URL.createObjectURL(blob);
     const a=document.createElement("a");a.href=url;a.download="agency_os_export.json";a.click();
   };
+
+  if(loading) return <div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100vh",background:C.bg,color:C.sub,flexDirection:"column",gap:16}}>
+    <div style={{width:32,height:32,background:`linear-gradient(135deg,${C.accent},${C.purple})`,borderRadius:8}}/>
+    <div style={{fontSize:14}}>Loading your clients...</div>
+  </div>;
+  const client=clients.find(c=>c.id===activeId)||clients[0];
+
   return <div style={{display:"flex",height:"100vh",background:C.bg,color:C.text,fontFamily:"'Outfit',sans-serif",overflow:"hidden"}}>
     <style>{`
       @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
@@ -815,6 +992,7 @@ function Dashboard() {
         })}
       </div>
       <div style={{padding:"10px 12px",borderTop:`1px solid ${C.border}`}}>
+        {saving&&<div style={{fontSize:10,color:C.emerald,textAlign:"center",marginBottom:6}}>● Saving...</div>}
         <button onClick={exportAll} style={{background:"transparent",border:`1px solid ${C.border}`,borderRadius:8,color:C.sub,padding:"7px 12px",cursor:"pointer",fontSize:11,width:"100%"}}>💾 Export All Data (JSON)</button>
       </div>
     </div>}
@@ -850,7 +1028,7 @@ function Dashboard() {
         {client&&tab==="reporting"&&   <ReportingTab   client={client} onUpdateClient={updClient}/>}
       </div>
     </div>
-    {showAdd&&<AddClientModal onAdd={c=>{setClients(cs=>[...cs,c]);setActiveId(c.id);}} onClose={()=>setShowAdd(false)}/>}
+    {showAdd&&<AddClientModal onAdd={addClient} onClose={()=>setShowAdd(false)}/>}
   </div>;
 }
 
