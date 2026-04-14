@@ -1,8 +1,6 @@
+﻿import { SignedIn, SignedOut, SignIn, UserButton } from '@clerk/clerk-react'
 import { useState } from "react";
 
-/* ══════════════════════════════════════════
-   DESIGN TOKENS
-══════════════════════════════════════════ */
 const C = {
   bg:"#060609", surface:"#0c0c14", card:"#10101c",
   border:"#1a1a28", borderHi:"#26263a",
@@ -49,22 +47,15 @@ const INFL_TIER = {
   mega: {label:"Mega",  range:"1M+",      color:C.gold},
 };
 
-/* ══════════════════════════════════════════
-   UTILS
-══════════════════════════════════════════ */
 const fmt      = n => n>=1e6?`${(n/1e6).toFixed(1)}M`:n>=1000?`${(n/1000).toFixed(1)}K`:String(n||0);
 const fmtMoney = n => n>=1000?`$${(n/1000).toFixed(1)}K`:`$${(n||0).toFixed(0)}`;
 const uid      = () => Math.random().toString(36).slice(2,9);
-const todayStr = () => new Date().toISOString().slice(0,10);
 const dayOff   = n  => { const d=new Date(); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10); };
 const fmtDate  = s  => new Date(s+"T00:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric"});
 const daysUntil= s  => Math.round((new Date(s+"T00:00:00")-new Date(new Date().toDateString()))/86400000);
 const genCode  = n  => n.toUpperCase().replace(/[^A-Z]/g,"").slice(0,4)+(Math.floor(Math.random()*90)+10);
 const genUTM   = n  => `https://yourstore.com?utm_source=influencer&utm_campaign=${n.toLowerCase().replace(/\s+/g,"_")}`;
 
-/* ══════════════════════════════════════════
-   DEMO DATA
-══════════════════════════════════════════ */
 const DEMO = [
   {
     id:"c1", name:"Apex Fitness", color:C.emerald,
@@ -141,9 +132,6 @@ const DEMO = [
   },
 ];
 
-/* ══════════════════════════════════════════
-   ATOMS
-══════════════════════════════════════════ */
 const Btn = ({children,onClick,color,outline,small,disabled,full}) =>
   <button onClick={onClick} disabled={disabled} style={{background:disabled?"#1a1a28":outline?"transparent":(color||C.accent),border:outline?`1px solid ${color||C.borderHi}`:"none",borderRadius:9,color:disabled?C.muted:C.text,padding:small?"5px 11px":"9px 18px",cursor:disabled?"not-allowed":"pointer",fontSize:small?11:13,fontWeight:700,width:full?"100%":"auto",opacity:disabled?.5:1,whiteSpace:"nowrap"}}>{children}</button>;
 
@@ -197,9 +185,6 @@ const StatGrid = ({stats}) =>
     ))}
   </div>;
 
-/* ══════════════════════════════════════════
-   SOCIAL TAB
-══════════════════════════════════════════ */
 function SocialTab({client}) {
   const conn=Object.entries(client.social||{}).filter(([,v])=>v.connected);
   const [active,setActive]=useState(conn[0]?.[0]||"youtube");
@@ -251,9 +236,6 @@ function SocialTab({client}) {
   </div>;
 }
 
-/* ══════════════════════════════════════════
-   ECOMMERCE TAB
-══════════════════════════════════════════ */
 function EcomTab({client}) {
   const conn=Object.entries(client.ecommerce||{}).filter(([,v])=>v.connected);
   const [active,setActive]=useState(conn[0]?.[0]||"shopify");
@@ -305,9 +287,6 @@ function EcomTab({client}) {
   </div>;
 }
 
-/* ══════════════════════════════════════════
-   ADS TAB
-══════════════════════════════════════════ */
 function AdsTab({client}) {
   const gd=client.ads?.google; const md=client.ads?.meta;
   const ts=(gd?.connected?gd.spend:0)+(md?.connected?md.spend:0);
@@ -354,9 +333,6 @@ function AdsTab({client}) {
   </div>;
 }
 
-/* ══════════════════════════════════════════
-   EMAIL TAB
-══════════════════════════════════════════ */
 function EmailTab({client}) {
   const kd=client.email?.klaviyo; const md=client.email?.mailchimp;
   const ts=(kd?.connected?kd.subscribers:0)+(md?.connected?md.subscribers||0:0);
@@ -399,9 +375,6 @@ function EmailTab({client}) {
   </div>;
 }
 
-/* ══════════════════════════════════════════
-   INFLUENCER TAB
-══════════════════════════════════════════ */
 function InfluencerRow({inf,onUpdate,onDelete}) {
   const [open,setOpen]=useState(false);
   const [url,setUrl]=useState("");
@@ -484,7 +457,6 @@ function InfluencerTab({client,onUpdateClient}) {
   const totalRev=infls.reduce((s,i)=>s+(i.totalRevenue||0),0);
   const totalConv=infls.reduce((s,i)=>s+(i.posts||[]).reduce((s2,p)=>s2+(p.conversions||0),0),0);
   const top=infls.length?[...infls].sort((a,b)=>(b.totalRevenue||0)-(a.totalRevenue||0))[0]:null;
-
   const add=()=>{
     const n={id:uid(),name:form.name,platform:form.platform,followers:parseInt(form.followers)||0,tier:form.tier,status:"outreach",commission:parseFloat(form.commission)||10,contact:form.contact,posts:[],totalRevenue:0,paid:false,promoCode:genCode(form.name),affiliateLink:genUTM(form.name)};
     onUpdateClient({...client,influencers:[...infls,n]});
@@ -493,25 +465,23 @@ function InfluencerTab({client,onUpdateClient}) {
   };
   const upd=upd2=>onUpdateClient({...client,influencers:infls.map(i=>i.id===upd2.id?upd2:i)});
   const del=id=>onUpdateClient({...client,influencers:infls.filter(i=>i.id!==id)});
-
   const genAI=async()=>{
     setAiLoading(true);setAiIdeas("");
     const summary=infls.map(i=>`${i.name} (${INFL_TIER[i.tier]?.label} ${PLAT[i.platform]?.label}, ${fmt(i.followers)} followers): ${i.totalRevenue>0?fmtMoney(i.totalRevenue)+" revenue, "+i.posts?.length+" posts":"No posts yet"}`).join("\n");
     try{
       const r=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:800,messages:[{role:"user",content:`You are an influencer marketing strategist for a top agency. Analyze this roster for ${client.name}:\n\n${summary||"No influencers yet"}\n\nProvide:\n1. 🏆 Who to scale budget with and why\n2. ⚠️ Who's underperforming (if any)\n3. 🎯 3 influencer profiles to recruit next\n4. 💡 2 campaign ideas for this brand\n5. 📊 Optimal commission structure\n\nBe specific and direct.`}]})});
+        body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:800,messages:[{role:"user",content:`You are an influencer marketing strategist. Analyze this roster for ${client.name}:\n\n${summary||"No influencers yet"}\n\nProvide:\n1. 🏆 Who to scale budget with and why\n2. ⚠️ Who's underperforming\n3. 🎯 3 influencer profiles to recruit next\n4. 💡 2 campaign ideas\n5. 📊 Optimal commission structure\n\nBe specific and direct.`}]})});
       const j=await r.json();
       setAiIdeas(j.content?.find(b=>b.type==="text")?.text||"");
     }catch{setAiIdeas("Could not connect to AI.");}
     setAiLoading(false);
   };
-
   return <div style={{display:"flex",flexDirection:"column",gap:14}}>
     <StatGrid stats={[
-      {label:"Influencers",  val:infls.length,     color:C.accent},
+      {label:"Influencers",val:infls.length,color:C.accent},
       {label:"Revenue Driven",val:fmtMoney(totalRev),color:C.emerald},
-      {label:"Conversions",  val:totalConv,          color:C.sky},
-      {label:"Top Performer",val:top?.name||"—",     color:C.gold},
+      {label:"Conversions",val:totalConv,color:C.sky},
+      {label:"Top Performer",val:top?.name||"—",color:C.gold},
     ]}/>
     <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
       {["all","outreach","negotiating","contracted","posted","paid"].map(v=>(
@@ -556,9 +526,6 @@ function InfluencerTab({client,onUpdateClient}) {
   </div>;
 }
 
-/* ══════════════════════════════════════════
-   CALENDAR TAB
-══════════════════════════════════════════ */
 function CalendarTab({client,onUpdateClient}) {
   const [showAdd,setShowAdd]=useState(false);
   const [filter,setFilter]=useState("all");
@@ -628,9 +595,6 @@ function CalendarTab({client,onUpdateClient}) {
   </div>;
 }
 
-/* ══════════════════════════════════════════
-   AI STRATEGY
-══════════════════════════════════════════ */
 function StrategyTab({client}) {
   const [strategy,setStrategy]=useState(""); const [loading,setLoading]=useState(false); const [err,setErr]=useState("");
   const gen=async()=>{
@@ -642,7 +606,7 @@ function StrategyTab({client}) {
     const infls=`${client.influencers?.length||0} influencers, ${fmtMoney(client.influencers?.reduce((s,i)=>s+(i.totalRevenue||0),0)||0)} driven`;
     try{
       const r=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1200,messages:[{role:"user",content:`You are an elite full-funnel digital marketing strategist. Analyze ALL channels for ${client.name}:\n\nSOCIAL: ${social||"none"}\nECOMMERCE: ${ecom||"none"}\nADS: ${ads||"none"}\nEMAIL: ${email||"none"}\nINFLUENCERS: ${infls}\n\nDeliver:\n1. 🎯 Top 3 highest-ROI opportunities (cross-channel)\n2. 🎬 5 specific content ideas with titles\n3. 📢 Ad optimization recommendations\n4. 🤝 Influencer strategy\n5. 📧 Email/retention play\n6. 📅 90-day growth roadmap\n7. ⛔ What to stop immediately\n\nBe specific, data-driven, direct.`}]})});
+        body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1200,messages:[{role:"user",content:`You are an elite full-funnel digital marketing strategist. Analyze ALL channels for ${client.name}:\n\nSOCIAL: ${social||"none"}\nECOMMERCE: ${ecom||"none"}\nADS: ${ads||"none"}\nEMAIL: ${email||"none"}\nINFLUENCERS: ${infls}\n\nDeliver:\n1. 🎯 Top 3 highest-ROI opportunities\n2. 🎬 5 specific content ideas with titles\n3. 📢 Ad optimization recommendations\n4. 🤝 Influencer strategy\n5. 📧 Email/retention play\n6. 📅 90-day growth roadmap\n7. ⛔ What to stop immediately\n\nBe specific, data-driven, direct.`}]})});
       const j=await r.json();
       setStrategy(j.content?.find(b=>b.type==="text")?.text||"");
     }catch{setErr("Could not connect to AI.");}
@@ -652,7 +616,7 @@ function StrategyTab({client}) {
     {!strategy&&!loading&&<Card style={{textAlign:"center",padding:36}}>
       <div style={{fontSize:36,marginBottom:10}}>✦</div>
       <div style={{fontSize:17,fontWeight:700,marginBottom:6}}>Full-Funnel AI Strategy</div>
-      <div style={{color:C.sub,fontSize:13,marginBottom:20}}>Analyzes social, e-commerce, ads, email, and influencer data for {client.name}.</div>
+      <div style={{color:C.sub,fontSize:13,marginBottom:20}}>Analyzes all channels for {client.name}.</div>
       <Btn onClick={gen}>Generate Strategy</Btn>
     </Card>}
     {loading&&<Card style={{textAlign:"center",padding:40}}><div style={{fontSize:24,marginBottom:10}}>◌</div><div style={{color:C.sub}}>Analyzing all channels...</div></Card>}
@@ -667,14 +631,10 @@ function StrategyTab({client}) {
   </div>;
 }
 
-/* ══════════════════════════════════════════
-   REPORTING TAB
-══════════════════════════════════════════ */
 function ReportingTab({client,onUpdateClient}) {
   const [ghlKey,setGhlKey]=useState(""); const [ghlContact,setGhlContact]=useState(client.ghlContactId||"");
   const [slackToken,setSlackToken]=useState(""); const [slackChannel,setSlackChannel]=useState(client.slackChannel||"");
   const [status,setStatus]=useState("");
-
   const buildReport=()=>{
     const lines=[`╔══════════════════════════════╗`,` 📊 MONTHLY REPORT — ${client.name}`,` ${new Date().toLocaleDateString()}`,`╚══════════════════════════════╝`,""];
     const social=Object.entries(client.social||{}).filter(([,v])=>v.connected);
@@ -689,7 +649,6 @@ function ReportingTab({client,onUpdateClient}) {
     if(pending.length){ lines.push("📅 UPCOMING"); pending.slice(0,5).forEach(e=>lines.push(`  ${fmtDate(e.date)} [${PLAT[e.platform]?.short}] ${e.title}`)); }
     return lines.join("\n");
   };
-
   const pushGHL=async()=>{
     if(!ghlKey||!ghlContact){setStatus("⚠ Enter API key and Contact ID");return;}
     setStatus("Pushing...");
@@ -698,7 +657,6 @@ function ReportingTab({client,onUpdateClient}) {
       setStatus(r.ok?"✅ Pushed to GHL!":"❌ Error: "+r.status);
     }catch{setStatus("❌ Network error");}
   };
-
   const sendSlack=async()=>{
     if(!slackToken||!slackChannel){setStatus("⚠ Enter token & channel");return;}
     setStatus("Sending...");
@@ -708,13 +666,11 @@ function ReportingTab({client,onUpdateClient}) {
       setStatus(j.ok?"✅ Sent to Slack!":"❌ "+j.error);
     }catch{setStatus("❌ Network error");}
   };
-
   const exportData=()=>{
     const blob=new Blob([JSON.stringify(client,null,2)],{type:"application/json"});
     const url=URL.createObjectURL(blob);
     const a=document.createElement("a");a.href=url;a.download=`${client.name.replace(/\s/g,"_")}.json`;a.click();
   };
-
   return <div style={{display:"flex",flexDirection:"column",gap:14}}>
     <Card>
       <div style={{fontSize:13,fontWeight:700,marginBottom:12}}>📄 Monthly Report</div>
@@ -746,15 +702,12 @@ function ReportingTab({client,onUpdateClient}) {
     </div>
     <Card accent={C.accent}>
       <div style={{fontSize:13,fontWeight:700,marginBottom:6}}>💾 Export Data</div>
-      <div style={{fontSize:12,color:C.sub,marginBottom:12}}>Export all client data as JSON. Use this when you're ready to migrate to Supabase for multi-user access.</div>
+      <div style={{fontSize:12,color:C.sub,marginBottom:12}}>Export all client data as JSON for Supabase migration later.</div>
       <Btn onClick={exportData}>⬇ Export {client.name} (JSON)</Btn>
     </Card>
   </div>;
 }
 
-/* ══════════════════════════════════════════
-   ADD CLIENT MODAL
-══════════════════════════════════════════ */
 function AddClientModal({onAdd,onClose}) {
   const [name,setName]=useState(""); const [demo,setDemo]=useState(true);
   const COLORS=[C.emerald,C.accent,C.purple,C.gold,C.sky,C.rose,C.amber];
@@ -788,9 +741,6 @@ function AddClientModal({onAdd,onClose}) {
   </div>;
 }
 
-/* ══════════════════════════════════════════
-   MAIN APP
-══════════════════════════════════════════ */
 const TABS=[
   {id:"social",      label:"📱 Social"},
   {id:"ecommerce",   label:"🛍 Store"},
@@ -802,23 +752,20 @@ const TABS=[
   {id:"reporting",   label:"📄 Reports"},
 ];
 
-export default function AgencyOS() {
+function Dashboard() {
   const [clients,setClients]=useState(DEMO);
   const [activeId,setActiveId]=useState(DEMO[0].id);
   const [tab,setTab]=useState("social");
   const [showAdd,setShowAdd]=useState(false);
   const [sidebar,setSidebar]=useState(true);
-
   const client=clients.find(c=>c.id===activeId)||clients[0];
   const updClient=u=>setClients(cs=>cs.map(c=>c.id===u.id?u:c));
   const delClient=id=>{ const r=clients.filter(c=>c.id!==id); setClients(r); if(activeId===id&&r.length) setActiveId(r[0].id); };
-
   const exportAll=()=>{
     const blob=new Blob([JSON.stringify(clients,null,2)],{type:"application/json"});
     const url=URL.createObjectURL(blob);
     const a=document.createElement("a");a.href=url;a.download="agency_os_export.json";a.click();
   };
-
   return <div style={{display:"flex",height:"100vh",background:C.bg,color:C.text,fontFamily:"'Outfit',sans-serif",overflow:"hidden"}}>
     <style>{`
       @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
@@ -826,8 +773,6 @@ export default function AgencyOS() {
       ::-webkit-scrollbar{width:4px;}::-webkit-scrollbar-track{background:${C.bg};}::-webkit-scrollbar-thumb{background:${C.border};border-radius:4px;}
       button:hover{filter:brightness(1.1);}select option{background:${C.surface};}
     `}</style>
-
-    {/* SIDEBAR */}
     {sidebar&&<div style={{width:238,background:C.surface,borderRight:`1px solid ${C.border}`,display:"flex",flexDirection:"column",flexShrink:0}}>
       <div style={{padding:"15px 16px 12px",borderBottom:`1px solid ${C.border}`,display:"flex",alignItems:"center",gap:9}}>
         <div style={{width:27,height:27,background:`linear-gradient(135deg,${C.accent},${C.purple})`,borderRadius:8,flexShrink:0}}/>
@@ -873,8 +818,6 @@ export default function AgencyOS() {
         <button onClick={exportAll} style={{background:"transparent",border:`1px solid ${C.border}`,borderRadius:8,color:C.sub,padding:"7px 12px",cursor:"pointer",fontSize:11,width:"100%"}}>💾 Export All Data (JSON)</button>
       </div>
     </div>}
-
-    {/* MAIN */}
     <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
       <div style={{background:C.surface,borderBottom:`1px solid ${C.border}`,padding:"0 18px",display:"flex",alignItems:"center",gap:12,height:52,flexShrink:0,overflowX:"auto"}}>
         <button onClick={()=>setSidebar(!sidebar)} style={{background:"transparent",border:"none",color:C.sub,cursor:"pointer",fontSize:18,padding:0,flexShrink:0}}>☰</button>
@@ -884,12 +827,16 @@ export default function AgencyOS() {
           {(client?.calendar||[]).filter(e=>daysUntil(e.date)===0&&e.status!=="posted").length>0&&
             <span style={{background:C.goldLo,color:C.gold,border:`1px solid ${C.gold}44`,borderRadius:20,padding:"2px 8px",fontSize:10,fontWeight:700}}>📅 Due today</span>}
         </div>
-        <div style={{display:"flex",gap:3,marginLeft:"auto",flexShrink:0}}>
+        <div style={{display:"flex",gap:3,marginLeft:"auto",flexShrink:0,alignItems:"center"}}>
           {TABS.map(t=>(
             <button key={t.id} onClick={()=>setTab(t.id)} style={{background:tab===t.id?C.accentLo:"transparent",border:`1px solid ${tab===t.id?C.accentMid:C.border}`,borderRadius:8,color:tab===t.id?C.accent:C.sub,padding:"5px 10px",cursor:"pointer",fontSize:11,fontWeight:tab===t.id?700:400,whiteSpace:"nowrap"}}>
               {t.label}
             </button>
           ))}
+          {/* Clerk user button — shows avatar + sign out */}
+          <div style={{marginLeft:8}}>
+            <UserButton afterSignOutUrl="/"/>
+          </div>
         </div>
       </div>
       <div style={{flex:1,overflowY:"auto",padding:20}}>
@@ -903,7 +850,27 @@ export default function AgencyOS() {
         {client&&tab==="reporting"&&   <ReportingTab   client={client} onUpdateClient={updClient}/>}
       </div>
     </div>
-
     {showAdd&&<AddClientModal onAdd={c=>{setClients(cs=>[...cs,c]);setActiveId(c.id);}} onClose={()=>setShowAdd(false)}/>}
   </div>;
 }
+
+export default function AgencyOS() {
+  return <>
+    <SignedOut>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100vh",background:"#060609",flexDirection:"column",gap:24}}>
+        <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:8}}>
+          <div style={{width:36,height:36,background:"linear-gradient(135deg,#7b6fff,#c084fc)",borderRadius:10}}/>
+          <div>
+            <div style={{fontWeight:800,fontSize:20,color:"#e6e6f8",letterSpacing:-.3}}>AgencyOS</div>
+            <div style={{fontSize:10,color:"#3a3a52",letterSpacing:.8,textTransform:"uppercase"}}>Full Command Center</div>
+          </div>
+        </div>
+        <SignIn routing="hash"/>
+      </div>
+    </SignedOut>
+    <SignedIn>
+      <Dashboard/>
+    </SignedIn>
+  </>;
+}
+
